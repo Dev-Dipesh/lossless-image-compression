@@ -1,0 +1,14 @@
+{
+  "name": "aws-lambda-copy-s3-objects",
+  "version": "0.2.0",
+  "private": true,
+  "description": "AWS Lambda function to copy S3 objects from one bucket to another",
+  "main": "index.js",
+  "author": "Sellnews",
+  "dependencies": {
+    "async": "^1.5.0",
+    "aws-sdk": "^2.2.17",
+    "gm": "^1.22.0",
+    "path": "^0.12.7"
+  }
+}
