@@ -1,8 +1,8 @@
 {
-  "name": "aws-lambda-copy-s3-objects",
+  "name": "lossless-image-compression",
   "version": "0.2.0",
   "private": true,
-  "description": "AWS Lambda function to copy S3 objects from one bucket to another",
+  "description": "AWS Lambda function to compress images at blazing speed and high quality",
   "main": "index.js",
   "author": "Sellnews",
   "dependencies": {
