@@ -9,11 +9,7 @@ console.log("=============================================");
 // Load up all dependencies
 const AWS = require('aws-sdk');
 const async = require('async');
-const path = require('path');
-const gm = require('gm').subClass({
-	imageMagick: true
-});
-const util = require('util');
+const sharp = require('sharp');
 
 // CreateS3
 //
@@ -52,6 +48,16 @@ exports.handler = function(event, context) {
 }
 
 /**
+ * transform
+ * Transform image using sharp
+ */
+function transform(width, height) {
+	return sharp()
+		.resize(width, height)
+		.withoutEnlargement()
+}
+
+/**
  * processRecord
  *
  * Iterator function for async.each (called by the handler above)
@@ -65,20 +71,41 @@ function processRecord(record, callback) {
 
 	getTargetBuckets(srcBucket, (err, targets) => {
 		if (err) {
-			console.log("Error getting target bucket: ");
+			console.log("Error getting preview bucket: ");
 			console.log(err, err.stack);
 			callback(`Error getting target bucket(s) from the source bucket ${srcBucket}`);
 			return;
 		}
 
 		async.each(targets, (target, callback) => {
-			if (region !== null) {
-				targetBucketName = `${targetBucketName}@${regionName}`;
-			}
-
 			// Download image and compress
 			// Save processed image from above to new s3
-			console.log(`asynch.each => ${JSON.stringify(target, null, 2)}`);
+			const targetBucket = target.bucketName;
+			const regionName = target.regionName;
+			const targetBucketName = targetBucket;
+			if (regionName != null) {
+				targetBucketName = targetBucketName + "@" + regionName;
+			}
+			const targetKey = srcKey;
+			
+			console.log("Copying '" + srcKey + "' from '" + srcBucket + "' to '" + targetBucketName + "'");
+			
+			// Copy the object from the source bucket
+			const s3 = createS3(regionName);
+			s3.copyObject({
+				Bucket: targetBucket,
+				Key: targetKey,
+				CopySource: encodeURIComponent(srcBucket + '/' + srcKey),
+				MetadataDirective: 'COPY'
+			}, (err, data) => {
+				if (err) {
+					console.log("Error copying '" + srcKey + "' from '" + srcBucket + "' to '" + targetBucketName + "'");
+					console.log(err, err.stack); // an error occurred
+					callback("Error copying '" + srcKey + "' from '" + srcBucket + "' to '" + targetBucketName + "'");
+				} else {
+					callback();
+				}
+			});
 		}, err => {
 			if (err) {
 				callback(err);
@@ -107,7 +134,7 @@ function getTargetBuckets(bucketName, callback) {
 		if (err) {
 			if (err.code == 'NoSuchTagSet') {
 				// No tags on the bucket, so the bucket is not configured properly.
-				callback(`Source bucket ${bucketName} is missing 'TargetBucket' tag.`, null);
+				callback(`Source bucket ${bucketName} is missing 'PreviewBucket' tag.`, null);
 			} else {
 				// Some other error
 				callback(err, null);
@@ -117,11 +144,11 @@ function getTargetBuckets(bucketName, callback) {
 			console.log(data);
 			const tags = data.TagSet;
 
-			console.log(`Looking for 'TargetBucket' tag...`);
+			console.log(`Looking for 'PreviewBucket' tag...`);
 			for (let i = 0; i < tags.length; ++i) {
 				const tag = tags[i];
-				if (tag.Key == 'TargetBucket') {
-					console.log(`Tag 'TargetBucket' found with value ${tag.Value}`);
+				if (tag.Key == 'PreviewBucket') {
+					console.log(`Tag 'PreviewBucket' found with value ${tag.Value}`);
 
 					const tagValue = tag.Value.trim();
 					const buckets = tag.Value.split(' ');
@@ -146,6 +173,6 @@ function getTargetBuckets(bucketName, callback) {
 				}
 			}
 		}
-		callback(`Tag 'TargetBucket' no found`, null);
+		callback(`Tag 'PreviewBucket' no found`, null);
 	});
 }
